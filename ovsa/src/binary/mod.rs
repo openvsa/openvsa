@@ -1,8 +1,9 @@
-use sprs::CsVec;
-use rand::seq::index::sample;
-use rand::thread_rng;
 
 pub mod binary {
+    use sprs::CsVec;
+    use rand::seq::index::sample;
+    use rand::rng;
+
     /// Generates a sparse random binary vector of given size with a specified number of active (1) entries.
     /// This could probably be optimized to use bit fields instead of u8 vectors.
     /// # Arguments
@@ -12,7 +13,7 @@ pub mod binary {
     /// A sparse binary vector represented as `CsVec<i8>`.
     pub fn sparse_random(dimension: usize, n_active: usize) -> CsVec<i8> {
 
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let indices = sample(&mut rng, dimension, n_active).into_vec();
         let data = vec![1i8; n_active];
 
@@ -31,14 +32,14 @@ pub mod binary {
         let mut result_data = vec![0i8; size];
 
         for vec in vectors {
-            for (idx, &val) in vec.iter() {
-                result_data[idx] += val * 2 - 1;
+            for (index, &value) in vec.iter() {
+                result_data[index] += value * 2 - 1;
             }
         }
 
         let indices: Vec<usize> = result_data.iter()
             .enumerate()
-            .filter_map(|(i, &v)| if v > 0 { Some(i) } else { None })
+            .filter_map(|(index, &value)| if value > 0 { Some(index) } else { None })
             .collect();
 
         let data: Vec<i8> = indices.iter().map(|&i| result_data[i]).collect();
@@ -69,8 +70,8 @@ pub mod binary {
         let size = vec1.dim();
         let mut result = vec1 + vec2;
         let indices: Vec<usize> = result.iter()
-            .enumerate()
-            .filter_map(|(i, &v)| if v == 1 { Some(i) } else { None })
+            // XOR operation: 1 + 1 = 0, so we keep only entries with value 1
+            .filter_map(|(index, &value)| if value == 1 { Some(index) } else { None })
             .collect();
 
         let data: Vec<i8> = indices.iter().map(|&i| 1i8).collect();
