@@ -33,6 +33,20 @@ pub mod binary {
         CsVec::new(dimension, indices.to_vec(), data)
     }
 
+    /// Computes the Hamming distance between two sparse binary vectors.
+    /// The Hamming distance is defined as the number of positions at which the corresponding entries are different.
+    /// # Arguments
+    /// * `vec1` - The first sparse binary vector.
+    /// * `vec2` - The second sparse binary vector.
+    /// # Returns
+    /// The Hamming distance as a usize.
+    pub fn hamming_distance(vec1: &CsVec<i8>, vec2: &CsVec<i8>) -> usize {
+        assert_eq!(vec1.dim(), vec2.dim(), "Vectors must be of the same dimension to compute Hamming distance.");
+
+        let bound_vec = bind(vec1, vec2);
+        bound_vec.nnz()
+    }
+
     /// Computes the consensus sum of a slice of sparse binary vectors.
     /// The consensus sum is determined by taking the majority value at each index across all vectors.
     /// # Arguments
@@ -88,6 +102,30 @@ pub mod binary {
 
         from_indices(size, &indices)
     }
+
+
+    pub fn unbind(vec1: &CsVec<i8>, vec2: &CsVec<i8>) -> CsVec<i8> {
+        // In binary vectors, binding and unbinding are the same operation (XOR)
+        bind(vec1, vec2)
+    }
+
+
+    /// Computes the similarity between two sparse binary vectors.
+    /// Similarity is defined as 1 - (Hamming distance / dimension).
+    /// # Arguments
+    /// * `vec1` - The first sparse binary vector.
+    /// * `vec2` - The second sparse binary vector.
+    /// # Returns
+    /// The similarity as a f64 value between 0.0 and 1.0
+    pub fn similarity(vec1: &CsVec<i8>, vec2: &CsVec<i8>) -> f64 {
+        assert_eq!(vec1.dim(), vec2.dim(), "Vectors must be of the same dimension to compute similarity.");
+
+        let sim = hamming_distance(vec1, vec2) as f64 / vec1.dim() as f64;
+
+        1f64 - sim
+    }
+
+
 
 
 
