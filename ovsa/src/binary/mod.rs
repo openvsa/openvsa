@@ -92,6 +92,13 @@ pub mod binary {
         from_indices(size, &indices)
     }
 
+    /// Performs a cyclic shift on a sparse binary vector.
+    /// Typically used for implementing permutation operations, or binding/unbinding via shifting (e.g. left/right, respectively).
+    /// # Arguments
+    /// * `vec` - The sparse binary vector to be shifted.
+    /// * `shift_by` - The number of positions to shift. Positive values shift to the right, negative values shift to the left.
+    /// # Returns
+    /// A new sparse binary vector that has been cyclically shifted.
     pub fn cyclic_shift(vec: &CsVec<i8>, shift_by: isize) -> CsVec<i8> {
         let size = vec.dim() as isize;
         let mut new_indices: Vec<usize> = Vec::new();
