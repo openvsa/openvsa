@@ -2,6 +2,7 @@
 pub mod binary {
     use sprs::CsVec;
     use rand::seq::index::sample;
+    use rand::distr::Uniform;
     use rand::rng;
 
     /// Generates a sparse random binary vector of given size with a specified number of active (1) entries.
@@ -69,9 +70,22 @@ pub mod binary {
             }
         }
 
+        let mut rng  = rng();
+        let uniform = Uniform::new(0.0, 1.0).unwrap();
+
+        fn set_active(value: i8, rng: &mut impl rand::Rng, uniform: &Uniform<f64>) -> bool {
+            if value > 0 {
+                true
+            } else if value < 0 {
+                false
+            } else {
+                rng.sample(uniform) > 0.5
+            }
+        }
+
         let indices: Vec<usize> = result_data.iter()
             .enumerate()
-            .filter_map(|(index, &value)| if value > 0 { Some(index) } else { None })
+            .filter_map(|(index, &value)| if set_active(value, &mut rng, &uniform) { Some(index) } else { None })
             .collect();
 
         from_indices(size, &indices)
