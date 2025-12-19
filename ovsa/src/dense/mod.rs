@@ -3,6 +3,7 @@ use ndarray_linalg::Norm;
 use rand::distr::Uniform;
 use rand::{Rng, rng};
 
+use crate::errors::OVSAError;
 
 /// Generates a random dense vector of given size with values uniformly distributed between min and max.
 /// # Arguments
@@ -11,12 +12,18 @@ use rand::{Rng, rng};
 /// * `max` - The maximum value for the uniform distribution.
 /// # Returns
 /// A dense vector represented as `Array1<f32>`.
-pub fn random_uniform(dimension: usize, min: f32, max: f32) -> Array1<f32> {
+pub fn random_uniform(dimension: usize, min: f32, max: f32) -> Result<Array1<f32>, OVSAError> {
+    if dimension == 0 {
+        return Err(OVSAError::ZeroDimension);
+    }
+
     let mut rng = rng();
     let uniform = Uniform::new(min, max).unwrap();
 
-    Array1::from(
+    Ok(
+        Array1::from(
         (&mut rng).sample_iter(&uniform).take(dimension).collect::<Vec<f32>>()
+        )
     )
 }
 
@@ -26,14 +33,23 @@ pub fn random_uniform(dimension: usize, min: f32, max: f32) -> Array1<f32> {
 /// * `array_vec` - A slice of dense vectors represented as `Array1<f32>`.
 /// # Returns
 /// A dense vector representing the superposition result.
-pub fn superposition(array_vec: &[Array1<f32>]) -> Array1<f32> {
+pub fn superposition(array_vec: &[Array1<f32>]) -> Result<Array1<f32>, OVSAError> {
+    if array_vec.is_empty() {
+        return Err(OVSAError::EmptyVectorList);
+    }
+
+    let size = array_vec.get(0).expect("Input slice is empty").len();
+
     let mut result = Array1::<f32>::zeros(array_vec[0].len());
     // todo: optimize
     for array in array_vec {
+        if array.len() != size {
+            return Err(OVSAError::VectorSizeMismatch);
+        }
         result += array;
     }
 
-    result
+    Ok(result)
 }
 
 

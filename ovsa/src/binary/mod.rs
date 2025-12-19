@@ -1,9 +1,10 @@
-
-
 use sprs::CsVec;
 use rand::seq::index::sample;
 use rand::distr::Uniform;
 use rand::rng;
+
+use crate::errors::OVSAError;
+
 
 
 /// Generates a sparse random binary vector of given size with a specified number of active (1) entries.
@@ -13,14 +14,22 @@ use rand::rng;
 /// * `n_active` - The number of active (1) entries in the vector.
 /// # Returns
 /// A sparse binary vector represented as `CsVec<i8>`.
-pub fn sparse_random(dimension: usize, n_active: usize) -> CsVec<i8> {
-
+pub fn sparse_random(dimension: usize, n_active: usize) -> Result<CsVec<i8>, OVSAError> {
+    if n_active == 0 {
+        return Err(OVSAError::ZeroActiveElements);
+    }
+    if dimension == 0 {
+        return Err(OVSAError::ZeroDimension);
+    }
+    if n_active > dimension {
+        return Err(OVSAError::TooManyActiveElements);
+    }
     let mut rng  = rng();
-    let mut indices: Vec<usize> = sample(&mut rng, dimension, n_active).into_vec();
-    indices.sort();
+    let indices: Vec<usize> = sample(&mut rng, dimension, n_active).into_vec();
+
     let data: Vec<i8> = vec![1i8; n_active];
 
-    CsVec::new(dimension, indices, data)
+    Ok(CsVec::new_from_unsorted(dimension, indices, data).unwrap())
 }
 
 
@@ -30,11 +39,18 @@ pub fn sparse_random(dimension: usize, n_active: usize) -> CsVec<i8> {
 /// * `indices` - A slice of indices where the entries are active (1).
 /// # Returns
 /// A sparse binary vector represented as `CsVec<i8>`.
-pub fn from_indices(dimension: usize, indices: &[usize]) -> CsVec<i8> {
+pub fn from_indices(dimension: usize, indices: &[usize]) -> Result<CsVec<i8>, OVSAError> {
+    if indices.is_empty() {
+        return Err(OVSAError::EmptyIndices);
+    }
+    if dimension == 0 {
+        return Err(OVSAError::ZeroDimension);
+    }
+
     let n_active = indices.len();
     let data: Vec<i8> = vec![1i8; n_active];
 
-    CsVec::new_from_unsorted(dimension, indices.to_vec(), data).unwrap()
+    Ok(CsVec::new_from_unsorted(dimension, indices.to_vec(), data).unwrap())
 }
 
 
@@ -48,7 +64,7 @@ pub fn from_indices(dimension: usize, indices: &[usize]) -> CsVec<i8> {
 pub fn hamming_distance(vec1: &CsVec<i8>, vec2: &CsVec<i8>) -> usize {
     assert_eq!(vec1.dim(), vec2.dim(), "Vectors must be of the same dimension to compute Hamming distance.");
 
-    let bound_vec = xor(vec1, vec2);
+    let bound_vec = xor(vec1, vec2).expect("XOR operation failed in Hamming distance computation.");
     bound_vec.nnz()
 }
 
@@ -59,12 +75,20 @@ pub fn hamming_distance(vec1: &CsVec<i8>, vec2: &CsVec<i8>) -> usize {
 /// * `vectors` - A slice of sparse binary vectors represented as `CsVec<i8>`.
 /// # Returns
 /// A sparse binary vector representing the consensus sum.
-pub fn consensus_sum(vectors: &[CsVec<i8>]) -> CsVec<i8> {
+pub fn consensus_sum(vectors: &[CsVec<i8>]) -> Result<CsVec<i8>, OVSAError> {
+    if vectors.is_empty() {
+        return Err(OVSAError::EmptyVectorList);
+    }
+
     // todo: optimize this to avoid using a full vector
     let size: usize = vectors[0].dim();
     let mut result_data: Vec<i16> = vec![0i16; size];
 
     for vec in vectors {
+        if size != vec.dim() {
+            return Err(OVSAError::VectorSizeMismatch);
+        }
+
         let active_indices = vec.indices();
         for index in 0..size {
             if active_indices.contains(&index) {
@@ -93,9 +117,7 @@ pub fn consensus_sum(vectors: &[CsVec<i8>]) -> CsVec<i8> {
         .filter_map(|(index, &value)| if set_active(value, &mut rng, &uniform) { Some(index) } else { None })
         .collect();
 
-    indices.sort();
-
-    from_indices(size, &indices)
+    Ok(from_indices(size, &indices)?)
 }
 
 
@@ -105,8 +127,10 @@ pub fn consensus_sum(vectors: &[CsVec<i8>]) -> CsVec<i8> {
 /// * `vec2` - The second sparse binary vector.
 /// # Returns
 /// A sparse binary vector representing the XOR result.
-pub fn xor(vec1: &CsVec<i8>, vec2: &CsVec<i8>) -> CsVec<i8> {
-    assert_eq!(vec1.dim(), vec2.dim(), "Vectors must be of the same dimension for binding.");
+pub fn xor(vec1: &CsVec<i8>, vec2: &CsVec<i8>) -> Result<CsVec<i8>, OVSAError> {
+    if vec1.dim() != vec2.dim() {
+        return Err(OVSAError::VectorSizeMismatch);
+    }
 
     let size: usize = vec1.dim();
     // to simulate an XOR operation, we add the two vectors and keep only the entries where the sum is 1
@@ -116,7 +140,7 @@ pub fn xor(vec1: &CsVec<i8>, vec2: &CsVec<i8>) -> CsVec<i8> {
         .filter_map(|(index, &value)| if value == 1 { Some(index) } else { None })
         .collect();
 
-    from_indices(size, &indices)
+    Ok(from_indices(size, &indices)?)
 }
 
 
@@ -136,7 +160,7 @@ pub fn cyclic_shift(vec: &CsVec<i8>, shift_by: isize) -> CsVec<i8> {
         new_indices.push(new_index as usize);
     }
 
-    from_indices(vec.dim(), &new_indices)
+    from_indices(vec.dim(), &new_indices).unwrap()
 }
 
 
@@ -147,11 +171,13 @@ pub fn cyclic_shift(vec: &CsVec<i8>, shift_by: isize) -> CsVec<i8> {
 /// * `vec2` - The second sparse binary vector.
 /// # Returns
 /// The similarity as a f64 value between 0.0 and 1.0
-pub fn similarity(vec1: &CsVec<i8>, vec2: &CsVec<i8>) -> f64 {
-    assert_eq!(vec1.dim(), vec2.dim(), "Vectors must be of the same dimension to compute similarity.");
+pub fn similarity(vec1: &CsVec<i8>, vec2: &CsVec<i8>) -> Result<f64, OVSAError> {
+    if vec1.dim() != vec2.dim() {
+        return Err(OVSAError::VectorSizeMismatch);
+    }
 
     let sim = hamming_distance(vec1, vec2) as f64 / vec1.dim() as f64;
 
-    1f64 - sim
+    Ok(1f64 - sim)
 }
 
