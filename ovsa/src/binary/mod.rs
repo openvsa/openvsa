@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use sprs::CsVec;
 use rand::seq::index::sample;
 use rand::distr::Uniform;
@@ -82,20 +83,16 @@ pub fn consensus_sum(vectors: &[CsVec<i8>]) -> Result<CsVec<i8>, OVSAError> {
 
     // todo: optimize this to avoid using a full vector
     let size: usize = vectors[0].dim();
-    let mut result_data: Vec<i16> = vec![0i16; size];
+    let half_size: i16 = (vectors.len() as i16) / 2;
+    let mut counts: HashMap<usize, i16> = HashMap::new();
 
     for vec in vectors {
         if size != vec.dim() {
             return Err(OVSAError::VectorSizeMismatch);
         }
 
-        let active_indices = vec.indices();
-        for index in 0..size {
-            if active_indices.contains(&index) {
-                result_data[index] += 1;
-            } else {
-                result_data[index] -= 1;
-            }
+        for index in vec.indices() {
+            *counts.entry(*index).or_insert(0) += 1;
         }
     }
 
@@ -112,9 +109,8 @@ pub fn consensus_sum(vectors: &[CsVec<i8>]) -> Result<CsVec<i8>, OVSAError> {
         }
     }
 
-    let indices: Vec<usize> = result_data.iter()
-        .enumerate()
-        .filter_map(|(index, &value)| if set_active(value, &mut rng, &uniform) { Some(index) } else { None })
+    let indices: Vec<usize> = counts.iter()
+        .filter_map(|(&index, &value)| if set_active(value - half_size, &mut rng, &uniform) { Some(index) } else { None })
         .collect();
 
     Ok(from_indices(size, &indices)?)

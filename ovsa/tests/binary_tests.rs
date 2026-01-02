@@ -50,7 +50,7 @@ fn test_consensus_sum() {
 #[test]
 fn test_consensus_sum_tie() {
     let mut rng  = rng();
-    let dimension = 10000;
+    let dimension = 100000;
 
     let mut indices1: Vec<usize> = sample(&mut rng, dimension/2, dimension/4).into_vec();
     indices1.sort();
